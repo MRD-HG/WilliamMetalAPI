@@ -123,6 +123,8 @@ namespace WilliamMetalAPI.Services
                 }
 
                 // Create inventory movement record
+                var createdBy = string.IsNullOrWhiteSpace(userId) ? null : userId;
+
                 var inventoryMovement = new InventoryMovement
                 {
                     ProductId = movement.ProductId,
@@ -130,7 +132,7 @@ namespace WilliamMetalAPI.Services
                     Type = Enum.Parse<MovementType>(movement.Type),
                     Quantity = movement.Quantity,
                     Notes = movement.Notes,
-                    CreatedBy = userId,
+                    CreatedBy = createdBy,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -170,6 +172,8 @@ namespace WilliamMetalAPI.Services
                 variant.Stock = newStock;
 
                 // Create inventory movement record
+                var createdBy = string.IsNullOrWhiteSpace(userId) ? null : userId;
+
                 var inventoryMovement = new InventoryMovement
                 {
                     ProductId = adjustment.ProductId,
@@ -178,7 +182,7 @@ namespace WilliamMetalAPI.Services
                     Quantity = Math.Abs(difference),
                     Notes = adjustment.Reason,
                     ReferenceType = "ADJUSTMENT",
-                    CreatedBy = userId,
+                    CreatedBy = createdBy,
                     CreatedAt = DateTime.UtcNow
                 };
 

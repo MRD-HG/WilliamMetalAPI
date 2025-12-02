@@ -54,7 +54,7 @@ namespace WilliamMetalAPI.Controllers
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+                string? userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var purchase = await _purchaseService.CreatePurchaseAsync(createDto, userId);
 
                 return CreatedAtAction(nameof(GetPurchase), new { id = purchase.Id }, 

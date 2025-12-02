@@ -97,7 +97,7 @@ namespace WilliamMetalAPI.Data
                 entity.HasIndex(e => e.Name);
                 entity.HasMany(e => e.Sales)
                       .WithOne(e => e.Customer)
-                      .HasForeignKey(e => e.Id)
+                      .HasForeignKey(e => e.CustomerId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -131,7 +131,7 @@ namespace WilliamMetalAPI.Data
                 entity.HasIndex(e => e.Name);
                 entity.HasMany(e => e.Purchases)
                       .WithOne(e => e.Supplier)
-                      .HasForeignKey(e => e.Id)
+                      .HasForeignKey(e => e.SupplierId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 

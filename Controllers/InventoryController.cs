@@ -64,7 +64,7 @@ namespace WilliamMetalAPI.Controllers
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+                string? userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var result = await _inventoryService.UpdateStockAsync(movement, userId);
 
                 if (!result)
@@ -85,7 +85,7 @@ namespace WilliamMetalAPI.Controllers
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+                string? userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var result = await _inventoryService.AdjustStockAsync(adjustment, userId);
 
                 if (!result)

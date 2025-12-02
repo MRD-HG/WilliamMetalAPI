@@ -80,6 +80,8 @@ namespace WilliamMetalAPI.Services
             
             try
             {
+                var createdBy = string.IsNullOrWhiteSpace(userId) ? null : userId;
+
                 // Create or get supplier
                 var supplier = new Supplier
                 {
@@ -104,12 +106,13 @@ namespace WilliamMetalAPI.Services
                     Id = Guid.NewGuid().ToString(),
                     PurchaseNumber = await GeneratePurchaseNumberAsync(),
                     Supplier = supplier,
+                    SupplierId = supplier.Id,
                     Subtotal = subtotal,
                     Tax = tax,
                     Total = total,
                     PaymentStatus = Enum.Parse<PaymentStatus>(createDto.PaymentStatus),
                     DeliveryStatus = Enum.Parse<DeliveryStatus>(createDto.DeliveryStatus),
-                    CreatedBy = userId
+                    CreatedBy = createdBy
                 };
 
                 _context.Purchases.Add(purchase);

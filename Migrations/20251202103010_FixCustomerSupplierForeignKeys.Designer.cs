@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WilliamMetalAPI.Data;
@@ -11,9 +12,11 @@ using WilliamMetalAPI.Data;
 namespace WilliamMetalAPI.Migrations
 {
     [DbContext(typeof(WilliamMetalContext))]
-    partial class WilliamMetalContextModelSnapshot : ModelSnapshot
+    [Migration("20251202103010_FixCustomerSupplierForeignKeys")]
+    partial class FixCustomerSupplierForeignKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

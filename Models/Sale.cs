@@ -30,6 +30,8 @@ namespace WilliamMetalAPI.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         
         // Foreign keys
+        [Required]
+        public string CustomerId { get; set; } = string.Empty;
         public string? CreatedBy { get; set; }
         
         // Navigation properties

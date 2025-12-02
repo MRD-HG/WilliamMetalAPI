@@ -75,6 +75,8 @@ namespace WilliamMetalAPI.Services
             
             try
             {
+                var createdBy = string.IsNullOrWhiteSpace(userId) ? null : userId;
+
                 // Create or get customer
                 var customer = new Customer
                 {
@@ -98,12 +100,13 @@ namespace WilliamMetalAPI.Services
                     Id = Guid.NewGuid().ToString(),
                     InvoiceNumber = await GenerateInvoiceNumberAsync(),
                     Customer = customer,
+                    CustomerId = customer.Id,
                     Subtotal = subtotal,
                     Tax = tax,
                     Total = total,
                     PaymentMethod = Enum.Parse<PaymentMethod>(createDto.PaymentMethod),
                     Status = SaleStatus.COMPLETED,
-                    CreatedBy = userId
+                    CreatedBy = createdBy
                 };
 
                 _context.Sales.Add(sale);
@@ -147,7 +150,7 @@ namespace WilliamMetalAPI.Services
                         Quantity = itemDto.Quantity,
                         ReferenceType = "SALE",
                         ReferenceId = sale.Id,
-                        CreatedBy = userId,
+                        CreatedBy = createdBy,
                         CreatedAt = DateTime.UtcNow
                     };
 

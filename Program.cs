@@ -3,6 +3,7 @@ using Microsoft.OpenApi.Models;
 using System.IO;
 using WilliamMetalAPI.Data;
 using WilliamMetalAPI.Services;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,8 +63,12 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
 var app = builder.Build();
+
+// QuestPDF license (community)
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
