@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>William Metal - لوحة التحكم</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+        
+        .hero-section {
+            background: linear-gradient(rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.8)), url('resources/hero-metal.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .metric-card {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .nav-link {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-link:hover {
+            color: #1e40af;
+        }
+        
+        .nav-link.active {
+            color: #1e40af;
+            font-weight: 600;
+        }
+        
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #1e40af;
+            border-radius: 1px;
+        }
+        
+        .chart-container {
+            height: 300px;
+        }
+        
+        .stock-alert {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.6s ease;
+        }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Small adjustments for ECharts container when using fallback */
+        .sales-bars { padding: 8px; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-slate-800">William Metal</h1>
+                    </div>
+                    <div class="hidden md:block mr-10">
+                        <div class="flex items-baseline space-x-4">
+                            <a href="index.html" class="nav-link active px-3 py-2 text-sm font-medium text-slate-700" data-nav="index.html">
+                                <i class="fas fa-tachometer-alt ml-2"></i>لوحة التحكم
+                            </a>
+                            <a href="products.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="products.html">
+                                <i class="fas fa-boxes ml-2"></i>المنتجات
+                            </a>
+                            <a href="inventory.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="inventory.html">
+                                <i class="fas fa-warehouse ml-2"></i>المخزون
+                            </a>
+                            <a href="sales.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="sales.html">
+                                <i class="fas fa-shopping-cart ml-2"></i>المبيعات
+                            </a>
+                            <a href="purchases.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="purchases.html">
+                                <i class="fas fa-truck ml-2"></i>المشتريات
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div>
+                        <span class="text-sm text-slate-600" data-user-info="name">مدير النظام</span>
+                    </div>
+                    <button class="p-2 text-slate-600 hover:text-slate-800 transition-colors" id="logoutBtn" title="تسجيل الخروج">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-6xl font-bold text-white mb-6 fade-in">
+                    نظام إدارة William Metal
+                </h1>
+                <p class="text-xl text-gray-200 mb-8 max-w-3xl mx-auto fade-in">
+                    نظام متكامل لإدارة منتجات الحديد والصلب مع متابعة المخزون، المبيعات، المشتريات، والتقارير الشاملة
+                </p>
+                <div class="flex flex-wrap justify-center gap-4 fade-in">
+                    <button onclick="window.location.href='products.html'" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-boxes ml-2"></i>إدارة المنتجات
+                    </button>
+                    <button onclick="window.location.href='sales.html'" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-shopping-cart ml-2"></i>إنشاء فاتورة
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="metric-card glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">إجمالي المنتجات</p>
+                        <p class="text-3xl font-bold text-slate-900" id="totalProducts">
+                            <span class="skeleton w-12 h-8 inline-block"></span>
+                        </p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <i class="fas fa-boxes text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">قيمة المخزون</p>
+                        <p class="text-3xl font-bold text-slate-900" id="totalStockValue">
+                            <span class="skeleton w-20 h-8 inline-block"></span>
+                        </p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <i class="fas fa-warehouse text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">إجمالي المبيعات</p>
+                        <p class="text-3xl font-bold text-slate-900" id="totalSales">
+                            <span class="skeleton w-20 h-8 inline-block"></span>
+                        </p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <i class="fas fa-shopping-cart text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">تنبيهات المخزون</p>
+                        <p class="text-3xl font-bold text-red-600" id="stockAlerts">
+                            <span class="skeleton w-12 h-8 inline-block"></span>
+                        </p>
+                    </div>
+                    <div class="p-3 bg-red-100 rounded-full">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Sales Chart -->
+            <div class="glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-slate-900">مخطط المبيعات (آخر 30 يوم)</h3>
+                    <div class="flex items-center text-sm text-slate-600">
+                        <i class="fas fa-chart-line ml-2"></i>
+                        المبيعات اليومية
+                    </div>
+                </div>
+                <div class="chart-container" id="salesChart"></div>
+            </div>
+
+            <!-- Stock Alerts -->
+            <div class="glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-slate-900">تنبيهات المخزون</h3>
+                    <button onclick="window.location.href='inventory.html'" class="text-sm text-blue-600 hover:text-blue-800">
+                        عرض الكل <i class="fas fa-arrow-left"></i>
+                    </button>
+                </div>
+                <div class="space-y-4" id="stockAlertsList">
+                    <div class="skeleton h-12 rounded"></div>
+                    <div class="skeleton h-12 rounded"></div>
+                    <div class="skeleton h-12 rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="glass-card rounded-xl p-6 fade-in">
+            <h3 class="text-lg font-semibold text-slate-900 mb-6">إجراءات سريعة</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button onclick="window.location.href='products.html'" class="p-4 border-2 border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-right">
+                    <i class="fas fa-plus-circle text-blue-600 text-2xl mb-2"></i>
+                    <p class="font-semibold text-slate-900">إضافة منتج</p>
+                    <p class="text-sm text-slate-600">إضافة منتج جديد للنظام</p>
+                </button>
+                <button onclick="window.location.href='sales.html'" class="p-4 border-2 border-green-200 rounded-lg hover:bg-green-50 transition-colors text-right">
+                    <i class="fas fa-receipt text-green-600 text-2xl mb-2"></i>
+                    <p class="font-semibold text-slate-900">إنشاء فاتورة</p>
+                    <p class="text-sm text-slate-600">إنشاء فاتورة بيع جديدة</p>
+                </button>
+                <button onclick="window.location.href='purchases.html'" class="p-4 border-2 border-purple-200 rounded-lg hover:bg-purple-50 transition-colors text-right">
+                    <i class="fas fa-shopping-bag text-purple-600 text-2xl mb-2"></i>
+                    <p class="font-semibold text-slate-900">طلب شراء</p>
+                    <p class="text-sm text-slate-600">إنشاء طلب شراء جديد</p>
+                </button>
+                <button onclick="window.location.href='inventory.html'" class="p-4 border-2 border-orange-200 rounded-lg hover:bg-orange-50 transition-colors text-right">
+                    <i class="fas fa-exchange-alt text-orange-600 text-2xl mb-2"></i>
+                    <p class="font-semibold text-slate-900">تحديث المخزون</p>
+                    <p class="text-sm text-slate-600">تعديل كميات المخزون</p>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800 text-white py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-slate-300">&copy; 2024 William Metal Management System. جميع الحقوق محفوظة.</p>
+        </div>
+    </footer>
+
+    <!-- App scripts: utils, auth, api -->
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+
+    <script>
+    // Final Dashboard bootstrap — uses API + utils modules above.
+    (function () {
+        // render chart (echarts if available, otherwise fallback)
+        async function renderSalesChart(raw) {
+            const container = document.getElementById('salesChart');
+            if (!container) return;
+
+            const dataArray = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+
+            if (dataArray.length === 0) {
+                container.innerHTML = '<div class="p-4 text-sm text-slate-600">لا توجد بيانات للمخطط</div>';
+                return;
+            }
+
+            if (typeof echarts !== 'undefined') {
+                const labels = dataArray.map(d => d.date ?? d.label ?? '');
+                const values = dataArray.map(d => Number(d.amount ?? d.value ?? 0));
+                const chart = echarts.init(container);
+                const option = {
+                    tooltip: { trigger: 'axis', formatter: p => `${p[0].axisValue}<br/>المبيعات: ${p[0].value} درهم` },
+                    xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 10 } },
+                    yAxis: { type: 'value', axisLabel: { formatter: '{value} درهم' } },
+                    series: [{
+                        data: values,
+                        type: 'line',
+                        smooth: true,
+                        lineStyle: { color: '#1e40af', width: 3 },
+                        areaStyle: {
+                            color: {
+                                type: 'linear',
+                                x: 0, y: 0, x2: 0, y2: 1,
+                                colorStops: [{ offset: 0, color: 'rgba(30,64,175,0.3)' }, { offset: 1, color: 'rgba(30,64,175,0.05)' }]
+                            }
+                        },
+                        itemStyle: { color: '#1e40af' }
+                    }]
+                };
+                chart.setOption(option);
+                window.addEventListener('resize', () => chart.resize());
+                return;
+            }
+
+            // fallback
+            container.classList.add('sales-bars');
+            const max = Math.max(...dataArray.map(d => Number(d.amount ?? d.value ?? 0)));
+            container.innerHTML = dataArray.map(d => {
+                const value = Number(d.amount ?? d.value ?? 0);
+                const label = d.date ?? d.label ?? '';
+                const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+                return `<div class="flex items-center gap-2 mb-1">
+                            <div class="text-xs text-slate-600 w-20">${label}</div>
+                            <div class="bg-blue-200 h-3 rounded flex-1" title="${value}">
+                                <div style="width:${pct}%;" class="bg-blue-600 h-3 rounded"></div>
+                            </div>
+                            <div class="text-sm text-slate-700 w-16 text-right">${value}</div>
+                        </div>`;
+            }).join('');
+        }
+
+        async function loadAndRenderDashboard() {
+            try {
+                // stats
+                const stats = await API.Dashboard.stats();
+                if (stats) {
+                    const payload = stats?.data ?? stats;
+                    document.getElementById('totalProducts').textContent = payload?.totalProducts ?? 0;
+                    document.getElementById('totalStockValue').textContent = Utils.formatCurrency(payload?.totalStockValue ?? 0);
+                    document.getElementById('totalSales').textContent = Utils.formatCurrency(payload?.totalSales ?? 0);
+                    document.getElementById('stockAlerts').textContent = payload?.stockAlerts ?? payload?.lowStockCount ?? 0;
+                }
+
+                // sales chart
+                const chartData = await API.Dashboard.salesChart({ days: 30 });
+                await renderSalesChart(chartData);
+
+                // stock alerts
+                const alerts = await API.Dashboard.stockAlerts();
+                const container = document.getElementById('stockAlertsList');
+                if (!alerts || (Array.isArray(alerts) && alerts.length === 0) || (alerts.data && alerts.data.length === 0)) {
+                    container.innerHTML = '<div class="p-4 text-sm text-slate-600">لا توجد تنبيهات مخزون</div>';
+                } else {
+                    const arr = Array.isArray(alerts) ? alerts : (alerts.data ?? []);
+                    container.innerHTML = arr.slice(0,5).map(a => {
+                        const name = a.productName ?? a.name ?? a.product ?? 'منتج';
+                        const currentStock = a.currentStock ?? a.stock ?? a.qty ?? 0;
+                        const type = (currentStock <= 0) ? 'out_of_stock' : 'low_stock';
+                        return `<div class="flex items-center justify-between p-3 ${type === 'out_of_stock' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'} border rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="p-2 ${type === 'out_of_stock' ? 'bg-red-100' : 'bg-yellow-100'} rounded-full mr-3">
+                                            <i class="fas ${type === 'out_of_stock' ? 'fa-times-circle text-red-600' : 'fa-exclamation-triangle text-yellow-600'}"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-slate-900">${name}</p>
+                                            <p class="text-sm text-slate-600">${a.variant ?? ''}</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="text-sm font-medium ${type === 'out_of_stock' ? 'text-red-600' : 'text-yellow-600'}">${currentStock} في المخزون</p>
+                                    </div>
+                                </div>`;
+                    }).join('');
+                }
+
+                // recent sales
+                const sales = await API.Sales.list({ pageSize: 5, sort: 'created_at_desc' });
+                const recentSalesContainer = document.getElementById('recentSales');
+                if (!recentSalesContainer) {
+                    // page may not have this section; ignore
+                } else {
+                    if (!sales || (Array.isArray(sales) && sales.length === 0) || (sales.data && sales.data.length === 0)) {
+                        recentSalesContainer.innerHTML = '<div class="text-center py-4 text-slate-500">لا توجد مبيعات حديثة</div>';
+                    } else {
+                        const arr = Array.isArray(sales) ? sales : (sales.data ?? []);
+                        recentSalesContainer.innerHTML = arr.slice(0,5).map(sale => {
+                            const name = sale.customer?.name ?? sale.customerName ?? 'عميل';
+                            const invoice = sale.invoiceNumber ?? sale.invoice_number ?? sale.id ?? '';
+                            return `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                        <div>
+                                            <p class="font-medium text-slate-900">${name}</p>
+                                            <p class="text-sm text-slate-600">${invoice}</p>
+                                        </div>
+                                        <div class="text-left">
+                                            <p class="font-semibold text-slate-900">${Utils.formatCurrency(sale.total ?? sale.amount ?? 0)}</p>
+                                            <p class="text-sm text-slate-600">${Utils.formatDate(sale.created_at ?? sale.createdAt ?? sale.date)}</p>
+                                        </div>
+                                    </div>`;
+                        }).join('');
+                    }
+                }
+
+                // recent purchases
+                const purchases = await API.Purchases.list({ pageSize: 5, sort: 'created_at_desc' });
+                const recentPurchasesContainer = document.getElementById('recentPurchases');
+                if (!recentPurchasesContainer) {
+                    // ignore if not present
+                } else {
+                    if (!purchases || (Array.isArray(purchases) && purchases.length === 0) || (purchases.data && purchases.data.length === 0)) {
+                        recentPurchasesContainer.innerHTML = '<div class="text-center py-4 text-slate-500">لا توجد مشتريات حديثة</div>';
+                    } else {
+                        const arr = Array.isArray(purchases) ? purchases : (purchases.data ?? []);
+                        recentPurchasesContainer.innerHTML = arr.slice(0,5).map(p => {
+                            const name = p.supplier?.name ?? p.supplierName ?? 'مورد';
+                            const num = p.purchaseNumber ?? p.purchase_number ?? p.id ?? '';
+                            return `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                        <div>
+                                            <p class="font-medium text-slate-900">${name}</p>
+                                            <p class="text-sm text-slate-600">${num}</p>
+                                        </div>
+                                        <div class="text-left">
+                                            <p class="font-semibold text-slate-900">${Utils.formatCurrency(p.total ?? p.amount ?? 0)}</p>
+                                            <p class="text-sm text-slate-600">${Utils.formatDate(p.created_at ?? p.createdAt ?? p.date)}</p>
+                                        </div>
+                                    </div>`;
+                        }).join('');
+                    }
+                }
+
+            } catch (err) {
+                console.error('Dashboard load error', err);
+                Utils.showNotification?.('حدث خطأ أثناء تحميل لوحة التحكم', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize helpers and auth
+            Utils.setActiveNav && Utils.setActiveNav('index.html');
+            await Auth.init();
+            Utils.updateUserInfo && Utils.updateUserInfo();
+
+            // logout
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) logoutBtn.addEventListener('click', () => { Auth.logout(); });
+
+            // Load dashboard data
+            await loadAndRenderDashboard();
+
+            // fade-in observer
+            const observer = new IntersectionObserver((entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }));
+            document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+            anime({ targets: '.metric-card', translateY: [50,0], opacity: [0,1], delay: anime.stagger(100), duration: 800, easing: 'easeOutExpo' });
+        });
+    })();
+    </script>
+</body>
+</html>

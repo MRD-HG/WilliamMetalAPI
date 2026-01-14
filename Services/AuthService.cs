@@ -66,6 +66,26 @@ namespace WilliamMetalAPI.Services
             };
         }
 
+        public async Task<UserDto?> GetDefaultUserAsync()
+        {
+            var user = await _context.Users
+                .Where(u => u.IsActive)
+                .OrderBy(u => u.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (user == null) return null;
+
+            return new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                FullName = user.FullName,
+                Email = user.Email,
+                Role = user.Role,
+                IsActive = user.IsActive
+            };
+        }
+
         public async Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
         {
             var user = await _context.Users.FindAsync(userId);

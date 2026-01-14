@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>William Metal - إدارة المنتجات</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <style>
+    /* Paste your same CSS here (kept identical to your supplied design) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%); min-height:100vh }
+    .glass-card{ background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.2) }
+    .product-card{ transition: all .3s ease; transform: translateY(0) }
+    .product-card:hover{ transform: translateY(-5px); box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 10px 10px -5px rgba(0,0,0,.04) }
+    .nav-link{ transition: all .3s ease; position: relative }
+    .nav-link:hover{ color: #1e40af }
+    .nav-link.active::after{ content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px; background:#1e40af; border-radius:1px }
+    .fade-in{ opacity:0; transform:translateY(20px) }
+    .fade-in.visible{ opacity:1; transform:translateY(0); transition: all .6s ease }
+    .modal{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:1000 }
+    .modal.show{ display:flex; align-items:center; justify-content:center }
+    .modal-content{ background:white; border-radius:12px; max-width:600px; width:90%; max-height:90vh; overflow-y:auto }
+    .variant-row{ border-left:3px solid #e2e8f0; transition: all .3s ease }
+    .variant-row:hover{ border-left-color:#1e40af; background-color:#f8fafc }
+    .search-input{ transition: all .3s ease }
+    .search-input:focus{ transform:scale(1.02); box-shadow:0 0 0 3px rgba(59,130,246,.1) }
+    .skeleton{ background: linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%); background-size:200% 100%; animation:loading 1.5s infinite }
+    @keyframes loading { 0%{background-position:200% 0}100%{background-position:-200% 0} }
+  </style>
+</head>
+<body>
+  <!-- Navigation (unchanged) -->
+  <nav class="bg-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center">
+          <div class="flex-shrink-0"><h1 class="text-2xl font-bold text-slate-800">William Metal</h1></div>
+          <div class="hidden md:block mr-10">
+            <div class="flex items-baseline space-x-4">
+              <a href="index.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="index.html"><i class="fas fa-tachometer-alt ml-2"></i>لوحة التحكم</a>
+              <a href="products.html" class="nav-link active px-3 py-2 text-sm font-medium text-slate-700" data-nav="products.html"><i class="fas fa-boxes ml-2"></i>المنتجات</a>
+              <a href="inventory.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="inventory.html"><i class="fas fa-warehouse ml-2"></i>المخزون</a>
+              <a href="sales.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="sales.html"><i class="fas fa-shopping-cart ml-2"></i>المبيعات</a>
+              <a href="purchases.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="purchases.html"><i class="fas fa-truck ml-2"></i>المشتريات</a>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center">
+          <div class="mr-4"><span class="text-sm text-slate-600" data-user-info="name">مدير النظام</span></div>
+          <button class="p-2 text-slate-600 hover:text-slate-800" id="logoutBtn" title="تسجيل الخروج"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">إدارة المنتجات</h2>
+          <p class="mt-1 text-sm text-slate-600">إدارة كامل فهرس المنتجات والمواصفات</p>
+        </div>
+        <div class="mt-4 md:mt-0 flex space-x-3">
+          <button id="addProductBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"><i class="fas fa-plus ml-2"></i>إضافة منتج</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Search and Filters -->
+    <div class="glass-card rounded-xl p-6 mb-8 fade-in">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-2">البحث</label>
+          <div class="relative">
+            <input type="text" id="searchInput" placeholder="ابحث عن منتج..." class="search-input w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-search text-slate-400"></i></div>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-2">الفئة</label>
+          <select id="categoryFilter" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">جميع الفئات</option>
+            <option value="أنابيب دائرية Tubes Round">أنابيب دائرية</option>
+            <option value="أنابيب مربعة Tube Carré">أنابيب مربعة</option>
+            <option value="زوايا Cornière">زوايا</option>
+            <option value="قضبان Plat">قضبان</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-2">حالة المخزون</label>
+          <select id="stockFilter" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">كل الحالات</option>
+            <option value="available">متوفر</option>
+            <option value="low">منخفض</option>
+            <option value="out">نفذ</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="productsGrid"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12">
+      <i class="fas fa-boxes text-6xl text-slate-300 mb-4"></i>
+      <h3 class="text-lg font-medium text-slate-900 mb-2">لا توجد منتجات</h3>
+      <p class="text-slate-600 mb-4">ابدأ بإضافة منتجات إلى فهرسك</p>
+      <button id="emptyAddBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"><i class="fas fa-plus ml-2"></i>إضافة أول منتج</button>
+    </div>
+  </main>
+
+  <!-- Product Modal -->
+  <div id="productModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="p-6 border-b border-slate-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-slate-900" id="modalTitle">إضافة منتج جديد</h3>
+          <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600" aria-label="إغلاق"><i class="fas fa-times text-xl"></i></button>
+        </div>
+      </div>
+
+      <form id="productForm" class="p-6">
+        <div class="space-y-6">
+          <div>
+            <h4 class="text-md font-medium text-slate-900 mb-4">المعلومات الأساسية</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">اسم المنتج (عربي)</label>
+                <input type="text" name="name_ar" id="productNameAr" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">اسم المنتج (فرنسي)</label>
+                <input type="text" name="name_en" id="productNameEn" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">الفئة</label>
+                <select id="productCategory" name="category" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">اختر الفئة</option>
+                  <option value="أنابيب دائرية Tubes Round">أنابيب دائرية</option>
+                  <option value="أنابيب مربعة Tube Carré">أنابيب مربعة</option>
+                  <option value="زوايا Cornière">زوايا</option>
+                  <option value="قضبان Plat">قضبان</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">رابط الصورة</label>
+                <input type="url" name="image" id="productImage" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-slate-700 mb-2">الوصف</label>
+              <textarea id="productDescription" name="description" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-md font-medium text-slate-900">المواصفات والأسعار</h4>
+              <button type="button" id="addVariantBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors"><i class="fas fa-plus ml-1"></i>إضافة مواصفة</button>
+            </div>
+
+            <div id="variantsContainer" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 mt-6 pt-6 border-t border-slate-200">
+          <button type="button" id="cancelBtn" class="px-4 py-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">إلغاء</button>
+          <button type="submit" id="saveBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"><i class="fas fa-save ml-2"></i>حفظ المنتج</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-800 text-white py-8 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <p class="text-slate-300">&copy; 2024 William Metal Management System. جميع الحقوق محفوظة.</p>
+    </div>
+  </footer>
+
+  <!-- App scripts (external) -->
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/products.js"></script>
+</body>
+</html>

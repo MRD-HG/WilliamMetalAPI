@@ -9,6 +9,9 @@ namespace WilliamMetalAPI.Services
         Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword);
         Task<bool> ValidateTokenAsync(string token);
 
+        // Single-user / no-JWT mode helper
+        Task<UserDto?> GetDefaultUserAsync();
+
         // Register new user
         Task<UserDto> RegisterAsync(RegisterRequest request);
     }

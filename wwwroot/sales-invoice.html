@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>William Metal - فاتورة بيع</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <script src="js/main.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/invoice.js"></script>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        min-height: 100vh;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .fade-in {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      .fade-in.visible {
+        opacity: 1;
+        transform: translateY(0);
+        transition: all 0.6s ease;
+      }
+      @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; }
+        .glass-card { box-shadow: none !important; border: none !important; }
+      }
+    </style>
+  </head>
+
+  <body class="min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm no-print">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-4 space-x-reverse">
+            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+              <i class="fas fa-industry text-white"></i>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold text-gray-900">William Metal</h1>
+              <p class="text-sm text-gray-500">نظام إدارة المبيعات</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-3 space-x-reverse">
+            <button id="backBtn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">
+              <i class="fas fa-arrow-right ml-2"></i>
+              رجوع
+            </button>
+            <button id="printBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+              <i class="fas fa-print ml-2"></i>
+              طباعة
+            </button>
+            <button id="downloadBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
+              <i class="fas fa-file-pdf ml-2"></i>
+              PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="glass-card rounded-2xl shadow-xl p-8 fade-in" id="invoiceContainer">
+        <div class="flex justify-between items-start mb-8">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">فاتورة بيع</h2>
+            <p class="text-sm text-gray-500">William Metal — قلعة مكونة، المغرب</p>
+          </div>
+          <div class="text-left">
+            <div class="text-sm text-gray-500">رقم الفاتورة</div>
+            <div class="text-xl font-bold text-gray-900" id="invNumber">—</div>
+            <div class="mt-2 text-sm text-gray-500">التاريخ</div>
+            <div class="text-sm font-semibold text-gray-900" id="invDate">—</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-gray-50 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">العميل</div>
+            <div class="font-semibold text-gray-900" id="invCustomer">—</div>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">الحالة</div>
+            <div class="font-semibold text-gray-900" id="invStatus">—</div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-gray-200">
+                <th class="text-right py-3 text-sm font-semibold text-gray-900">المنتج</th>
+                <th class="text-center py-3 text-sm font-semibold text-gray-900">الكمية</th>
+                <th class="text-right py-3 text-sm font-semibold text-gray-900">سعر الوحدة</th>
+                <th class="text-right py-3 text-sm font-semibold text-gray-900">المجموع</th>
+              </tr>
+            </thead>
+            <tbody id="invItems">
+              <!-- rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-8 flex justify-end">
+          <div class="w-full md:w-72">
+            <div class="flex justify-between text-sm text-gray-700">
+              <span>الإجمالي</span>
+              <span class="font-bold" id="invTotal">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200 text-xs text-gray-500">
+          <div>شكراً لتعاملكم معنا.</div>
+          <div class="mt-1">إذا احتجت مساعدة: info@williammetal.com</div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const el = document.querySelector('.fade-in');
+        if (el) setTimeout(() => el.classList.add('visible'), 50);
+      });
+    </script>
+  </body>
+</html>

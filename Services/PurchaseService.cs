@@ -82,36 +82,75 @@ namespace WilliamMetalAPI.Services
             {
                 var createdBy = string.IsNullOrWhiteSpace(userId) ? null : userId;
 
-                // Create or get supplier
-                var supplier = new Supplier
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Name = createDto.Supplier.Name,
-                    Contact = createDto.Supplier.Contact,
-                    Phone = createDto.Supplier.Phone,
-                    Address = createDto.Supplier.Address
-                };
+                // Resolve tax rate from settings (fallback to 0 if missing)
+                var taxRate = await _context.CompanySettings
+                    .AsNoTracking()
+                    .Select(s => s.TaxRate)
+                    .FirstOrDefaultAsync();
+                var taxFactor = Math.Max(0, taxRate) / 100m;
 
-                _context.Suppliers.Add(supplier);
-                await _context.SaveChangesAsync();
+                // Safe enum parsing (defaults)
+                var paymentStatus = PaymentStatus.PENDING;
+                if (!string.IsNullOrWhiteSpace(createDto.PaymentStatus) &&
+                    Enum.TryParse(createDto.PaymentStatus, true, out PaymentStatus ps))
+                {
+                    paymentStatus = ps;
+                }
+
+                var deliveryStatus = DeliveryStatus.PENDING;
+                if (!string.IsNullOrWhiteSpace(createDto.DeliveryStatus) &&
+                    Enum.TryParse(createDto.DeliveryStatus, true, out DeliveryStatus ds))
+                {
+                    deliveryStatus = ds;
+                }
+
+                // Create or get supplier
+                var supplierName = (createDto.Supplier?.Name ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(supplierName))
+                    throw new InvalidOperationException("Supplier name is required");
+
+                var supplierPhone = (createDto.Supplier?.Phone ?? string.Empty).Trim();
+                var supplier = await _context.Suppliers
+                    .FirstOrDefaultAsync(s => s.Name == supplierName && (supplierPhone == "" || s.Phone == supplierPhone));
+
+                if (supplier == null)
+                {
+                    supplier = new Supplier
+                    {
+                        Name = supplierName,
+                        Contact = createDto.Supplier?.Contact,
+                        Phone = string.IsNullOrWhiteSpace(supplierPhone) ? null : supplierPhone,
+                        Address = createDto.Supplier?.Address
+                    };
+
+                    _context.Suppliers.Add(supplier);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    // Update missing info (optional)
+                    supplier.Contact ??= createDto.Supplier?.Contact;
+                    supplier.Phone ??= string.IsNullOrWhiteSpace(supplierPhone) ? null : supplierPhone;
+                    supplier.Address ??= createDto.Supplier?.Address;
+                    await _context.SaveChangesAsync();
+                }
 
                 // Calculate totals
                 var subtotal = createDto.Items.Sum(i => i.UnitCost * i.Quantity);
-                var tax = subtotal * 0.1m; // 10% tax
+                var tax = subtotal * taxFactor;
                 var total = subtotal + tax;
 
                 // Create purchase
                 var purchase = new Purchase
                 {
-                    Id = Guid.NewGuid().ToString(),
                     PurchaseNumber = await GeneratePurchaseNumberAsync(),
                     Supplier = supplier,
                     SupplierId = supplier.Id,
                     Subtotal = subtotal,
                     Tax = tax,
                     Total = total,
-                    PaymentStatus = Enum.Parse<PaymentStatus>(createDto.PaymentStatus),
-                    DeliveryStatus = Enum.Parse<DeliveryStatus>(createDto.DeliveryStatus),
+                    PaymentStatus = paymentStatus,
+                    DeliveryStatus = deliveryStatus,
                     CreatedBy = createdBy
                 };
 
@@ -121,6 +160,9 @@ namespace WilliamMetalAPI.Services
                 // Create purchase items and update inventory
                 foreach (var itemDto in createDto.Items)
                 {
+                    if (itemDto.Quantity <= 0)
+                        throw new InvalidOperationException("Quantity must be > 0");
+
                     var variant = await _context.ProductVariants
                         .FirstOrDefaultAsync(v => v.Id == itemDto.VariantId && v.ProductId == itemDto.ProductId);
 
@@ -148,6 +190,20 @@ namespace WilliamMetalAPI.Services
                         purchase.DeliveryStatus == DeliveryStatus.PARTIAL)
                     {
                         variant.Stock += itemDto.Quantity;
+
+                        // Record inventory movement (IN)
+                        _context.InventoryMovements.Add(new InventoryMovement
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            VariantId = variant.Id,
+                            ProductId = variant.ProductId,
+                            Type = MovementType.IN,
+                            Quantity = itemDto.Quantity,
+                            Notes = $"Purchase {purchase.PurchaseNumber}",
+                            ReferenceType = "purchase",
+                            ReferenceId = purchase.Id,
+                            CreatedBy = createdBy
+                        });
                     }
                 }
 

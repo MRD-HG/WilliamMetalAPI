@@ -57,23 +57,35 @@ namespace WilliamMetalAPI.Controllers
         }
 
         [HttpGet("me")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetCurrentUser()
         {
+            // In this project we run without JWT middleware (single-user mode).
+            // If no authenticated user is present, fallback to the first active user.
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-
             var user = await _authService.GetCurrentUserAsync(userId);
             if (user == null)
             {
-                return NotFound(new { success = false, message = "User not found" });
+                // Fallback: return admin/first user when no JWT claims are available.
+                user = await _authService.GetDefaultUserAsync();
+                if (user == null)
+                    return NotFound(new { success = false, message = "User not found" });
             }
 
             return Ok(new { success = true, data = user });
         }
 
         [HttpPost("change-password")]
+        [AllowAnonymous]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                var u = await _authService.GetDefaultUserAsync();
+                userId = u?.Id ?? string.Empty;
+            }
 
             var result = await _authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
             if (!result)

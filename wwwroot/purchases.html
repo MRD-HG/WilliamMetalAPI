@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>William Metal - إدارة المشتريات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="js/main.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-link {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-link:hover {
+            color: #1e40af;
+        }
+        
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #1e40af;
+            border-radius: 1px;
+        }
+        
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.6s ease;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 95%;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+        
+        .purchase-item {
+            transition: all 0.3s ease;
+        }
+        
+        .purchase-item:hover {
+            background-color: #f8fafc;
+        }
+        
+        .purchase-row {
+            transition: all 0.3s ease;
+        }
+        
+        .purchase-row:hover {
+            background-color: #f8fafc;
+            transform: translateX(-5px);
+        }
+        
+        .search-input {
+            transition: all 0.3s ease;
+        }
+        
+        .search-input:focus {
+            transform: scale(1.02);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .product-selector {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-slate-800">William Metal</h1>
+                    </div>
+                    <div class="hidden md:block mr-10">
+                        <div class="flex items-baseline space-x-4">
+                            <a href="index.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="index.html">
+                                <i class="fas fa-tachometer-alt ml-2"></i>لوحة التحكم
+                            </a>
+                            <a href="products.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="products.html">
+                                <i class="fas fa-boxes ml-2"></i>المنتجات
+                            </a>
+                            <a href="inventory.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="inventory.html">
+                                <i class="fas fa-warehouse ml-2"></i>المخزون
+                            </a>
+                            <a href="sales.html" class="nav-link px-3 py-2 text-sm font-medium text-slate-700" data-nav="sales.html">
+                                <i class="fas fa-shopping-cart ml-2"></i>المبيعات
+                            </a>
+                            <a href="purchases.html" class="nav-link active px-3 py-2 text-sm font-medium text-slate-700" data-nav="purchases.html">
+                                <i class="fas fa-truck ml-2"></i>المشتريات
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <div class="mr-4">
+                        <span class="text-sm text-slate-600" data-user-info="name">مدير النظام</span>
+                    </div>
+                    <button class="p-2 text-slate-600 hover:text-slate-800" data-action="logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">إدارة المشتريات</h2>
+                    <p class="mt-1 text-sm text-slate-600">تسجيل المشتريات ومتابعة الموردين</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex space-x-3">
+                    <button onclick="openPurchaseModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        <i class="fas fa-plus ml-2"></i>طلب شراء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Purchase Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">مشتريات اليوم</p>
+                        <p class="text-3xl font-bold text-slate-900" id="todayPurchases">0</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <i class="fas fa-calendar-day text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">إجمالي المشتريات</p>
+                        <p class="text-3xl font-bold text-slate-900" id="totalPurchases">0</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <i class="fas fa-truck text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 fade-in">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-600">عدد الطلبات</p>
+                        <p class="text-3xl font-bold text-slate-900" id="totalOrders">0</p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <i class="fas fa-file-invoice text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="glass-card rounded-xl p-6 mb-8 fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">البحث</label>
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="ابحث عن طلب أو مورد..." 
+                               class="search-input w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-slate-400"></i>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">من التاريخ</label>
+                    <input type="date" id="dateFrom" 
+                           class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">إلى التاريخ</label>
+                    <input type="date" id="dateTo" 
+                           class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="exportPurchases()" class="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-download ml-2"></i>تصدير
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Purchases Table -->
+        <div class="glass-card rounded-xl overflow-hidden fade-in">
+            <div class="px-6 py-4 border-b border-slate-200">
+                <h3 class="text-lg font-semibold text-slate-900">قائمة المشتريات</h3>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">رقم الطلب</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">المورد</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">التاريخ</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">عدد العناصر</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">الإجمالي</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">حالة الدفع</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">حالة التوصيل</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="purchasesTableBody" class="bg-white divide-y divide-slate-200">
+                        <!-- Table rows will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <i class="fas fa-file-invoice text-6xl text-slate-300 mb-4"></i>
+            <h3 class="text-lg font-medium text-slate-900 mb-2">لا توجد مشتريات</h3>
+            <p class="text-slate-600 mb-4">ابدأ بإنشاء أول طلب شراء لك</p>
+            <button onclick="openPurchaseModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                <i class="fas fa-plus ml-2"></i>طلب شراء
+            </button>
+        </div>
+    </main>
+
+    <!-- Purchase Modal -->
+    <div id="purchaseModal" class="modal">
+        <div class="modal-content">
+            <div class="p-6 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-slate-900">طلب شراء جديد</h3>
+                    <button onclick="closePurchaseModal()" class="text-slate-400 hover:text-slate-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <form id="purchaseForm" class="p-6">
+                <!-- Supplier Information -->
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-slate-900 mb-4">معلومات المورد</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">اسم المورد</label>
+                            <input type="text" id="supplierName" required 
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">جهة الاتصال</label>
+                            <input type="text" id="supplierContact" 
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">رقم الهاتف</label>
+                            <input type="tel" id="supplierPhone" 
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">العنوان</label>
+                            <input type="text" id="supplierAddress" 
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Purchase Items -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-md font-medium text-slate-900">عناصر الطلب</h4>
+                        <button type="button" onclick="openProductSelector()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                            <i class="fas fa-plus ml-1"></i>إضافة عنصر
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-3" id="purchaseItems">
+                        <!-- Purchase items will be added here -->
+                    </div>
+                    
+                    <!-- Product Selector Modal -->
+                    <div id="productSelectorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+                        <div class="flex items-center justify-center min-h-screen p-4">
+                            <div class="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-hidden">
+                                <div class="p-4 border-b">
+                                    <div class="flex items-center justify-between">
+                                        <h3 class="text-lg font-semibold">اختر المنتج</h3>
+                                        <button onclick="closeProductSelector()" class="text-slate-400 hover:text-slate-600">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="mt-3">
+                                        <input type="text" id="productSearch" placeholder="ابحث عن منتج..." 
+                                               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                </div>
+                                <div class="p-4 product-selector" id="productList">
+                                    <!-- Product list will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Purchase Summary -->
+                <div class="border-t border-slate-200 pt-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">حالة الدفع</label>
+                            <select id="paymentStatus" required 
+                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="PENDING">قيد الانتظار</option>
+                                <option value="PAID">مدفوع</option>
+                                <option value="PARTIAL">مدفوع جزئياً</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">حالة التوصيل</label>
+                            <select id="deliveryStatus" required 
+                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="PENDING">قيد الانتظار</option>
+                                <option value="DELIVERED" selected>تم التوصيل</option>
+                                <option value="PARTIAL">تم التوصيل جزئياً</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-50 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-slate-700">المجموع الفرعي:</span>
+                            <span class="text-sm font-semibold text-slate-900" id="subtotal">0.00 درهم</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-slate-700">الضريبة:</span>
+                            <span class="text-sm font-semibold text-slate-900" id="taxAmount">0.00 درهم</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                            <span class="text-lg font-semibold text-slate-900">الإجمالي:</span>
+                            <span class="text-lg font-bold text-slate-900" id="totalAmount">0.00 درهم</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6 pt-6 border-t border-slate-200">
+                    <button type="button" onclick="closePurchaseModal()" 
+                            class="px-4 py-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                        إلغاء
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                        <i class="fas fa-save ml-2"></i>حفظ الطلب
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800 text-white py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-slate-300">&copy; 2024 William Metal Management System. جميع الحقوق محفوظة.</p>
+        </div>
+    </footer>
+
+    <!-- App scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/purchases.js"></script>
+</body>
+</html>

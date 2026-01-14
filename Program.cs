@@ -1,32 +1,26 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using WilliamMetalAPI.Data;
 using WilliamMetalAPI.Services;
 using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Only configure Kestrel with a PFX if the file exists (prevents startup crash when file is missing)
-var certPath = Path.Combine(builder.Environment.ContentRootPath, "certs", "dev-cert.pfx");
-if (File.Exists(certPath))
-{
-    builder.WebHost.ConfigureKestrel(options =>
-    {
-        options.ListenLocalhost(55837, listenOptions =>
-        {
-            listenOptions.UseHttps(certPath, "yourPfxPassword");
-        });
-    });
-}
-else
-{
-    Console.WriteLine($"Warning: certificate not found at '{certPath}'. Skipping custom Kestrel HTTPS configuration.");
-    Console.WriteLine("Use `dotnet dev-certs https --trust` or put your PFX at the path above to enable custom HTTPS.");
-}
+// Option 1 (simple): run everything over HTTP on a single port.
+// The front-end will be served from wwwroot and call the API on the same origin.
+builder.WebHost.UseUrls("http://localhost:5062");
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o =>
+    {
+        // Consistent JSON for the front-end
+        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        o.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // Simple Swagger doc (no JWT security)
@@ -77,14 +71,22 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Serve the front-end (static files)
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
-app.UseHttpsRedirection();
+// Health check used by the front-end (main.js)
+app.MapGet("/api/health", () => Results.Ok(new { ok = true, utc = DateTime.UtcNow }));
 
 app.UseCors("AllowAll");
 
 // Authentication removed: do not call UseAuthentication/UseAuthorization here.
 
 app.MapControllers();
+
+// If someone hits an unknown route, return the dashboard.
+// (This is safe for your multi-page front-end too.)
+app.MapFallbackToFile("index.html");
 
 // Initialize Database (catch and print errors so startup doesn't fail silently)
 using (var scope = app.Services.CreateScope())

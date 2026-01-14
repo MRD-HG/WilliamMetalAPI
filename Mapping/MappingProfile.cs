@@ -8,38 +8,35 @@ namespace WilliamMetalAPI.Mapping
     {
         public MappingProfile()
         {
-            // User mappings
-            CreateMap<User, UserDto>();
-
-            // Product mappings
+            // Products
             CreateMap<Product, ProductDto>();
             CreateMap<ProductVariant, ProductVariantDto>();
-            CreateMap<CreateProductDto, Product>();
-            CreateMap<CreateProductVariantDto, ProductVariant>();
-            CreateMap<UpdateProductDto, Product>();
 
-            // Inventory mappings
-            CreateMap<InventoryMovement, InventoryMovementDto>();
+            // Inventory
+            CreateMap<InventoryMovement, InventoryMovementDto>()
+                .ForMember(d => d.ProductName, o => o.MapFrom(s => s.Variant.Product.NameAr))
+                .ForMember(d => d.VariantName, o => o.MapFrom(s => s.Variant.Specification));
 
-            // Customer mappings
+            // Sales
             CreateMap<Customer, CustomerDto>();
-            CreateMap<CreateCustomerDto, Customer>();
+            CreateMap<SaleItem, SaleItemDto>()
+                .ForMember(d => d.ProductName, o => o.MapFrom(s => s.Variant.Product.NameAr))
+                .ForMember(d => d.VariantName, o => o.MapFrom(s => s.Variant.Specification));
+            CreateMap<Sale, SaleDto>()
+                .ForMember(d => d.PaymentMethod, o => o.MapFrom(s => s.PaymentMethod.ToString()))
+                .ForMember(d => d.Status, o => o.MapFrom(s => s.Status.ToString()));
 
-            // Sale mappings
-            CreateMap<Sale, SaleDto>();
-            CreateMap<SaleItem, SaleItemDto>();
-            CreateMap<CreateSaleDto, Sale>();
-            CreateMap<CreateSaleItemDto, SaleItem>();
-
-            // Supplier mappings
+            // Purchases
             CreateMap<Supplier, SupplierDto>();
-            CreateMap<CreateSupplierDto, Supplier>();
+            CreateMap<PurchaseItem, PurchaseItemDto>()
+                .ForMember(d => d.ProductName, o => o.MapFrom(s => s.Variant.Product.NameAr))
+                .ForMember(d => d.VariantName, o => o.MapFrom(s => s.Variant.Specification));
+            CreateMap<Purchase, PurchaseDto>()
+                .ForMember(d => d.PaymentStatus, o => o.MapFrom(s => s.PaymentStatus.ToString()))
+                .ForMember(d => d.DeliveryStatus, o => o.MapFrom(s => s.DeliveryStatus.ToString()));
 
-            // Purchase mappings
-            CreateMap<Purchase, PurchaseDto>();
-            CreateMap<PurchaseItem, PurchaseItemDto>();
-            CreateMap<CreatePurchaseDto, Purchase>();
-            CreateMap<CreatePurchaseItemDto, PurchaseItem>();
+            // Users
+            CreateMap<User, UserDto>();
         }
     }
 }

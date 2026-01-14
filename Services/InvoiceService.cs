@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using System.IO;
 using WilliamMetalAPI.Data;
 using WilliamMetalAPI.DTOs;
 
@@ -10,10 +12,12 @@ namespace WilliamMetalAPI.Services
     public class InvoiceService : IInvoiceService
     {
         private readonly WilliamMetalContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public InvoiceService(WilliamMetalContext context)
+        public InvoiceService(WilliamMetalContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
         public async Task<List<InvoiceDto>> GetInvoicesAsync()
@@ -58,8 +62,26 @@ namespace WilliamMetalAPI.Services
                 return null;
             }
 
-            var pdfBytes = BuildInvoicePdf(invoice);
+            var logoBytes = TryLoadLogoBytes();
+            var pdfBytes = BuildInvoicePdf(invoice, logoBytes);
             return (pdfBytes, invoice.InvoiceNumber);
+        }
+
+        private byte[]? TryLoadLogoBytes()
+        {
+            try
+            {
+                var webRoot = _env.WebRootPath;
+                if (string.IsNullOrWhiteSpace(webRoot)) return null;
+
+                var logoPath = Path.Combine(webRoot, "resources", "logo.png");
+                if (!File.Exists(logoPath)) return null;
+                return File.ReadAllBytes(logoPath);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static InvoiceDto BuildInvoiceDto(Models.Sale sale, Models.CompanySettings? company)
@@ -108,7 +130,7 @@ namespace WilliamMetalAPI.Services
             return await _context.CompanySettings.FirstOrDefaultAsync();
         }
 
-        private static byte[] BuildInvoicePdf(InvoiceDto invoice)
+        private static byte[] BuildInvoicePdf(InvoiceDto invoice, byte[]? logoBytes)
         {
             var doc = Document.Create(container =>
             {
@@ -120,25 +142,35 @@ namespace WilliamMetalAPI.Services
 
                     page.Header().Row(row =>
                     {
+                        // Logo (optional)
+                        if (logoBytes != null && logoBytes.Length > 0)
+                        {
+                            row.ConstantItem(90)
+                                .AlignMiddle()
+                                .AlignLeft()
+                                .Height(55)
+                                .Image(logoBytes);
+                        }
+
                         row.RelativeItem().Column(col =>
                         {
                             col.Item().Text(t => t.Span(invoice.Company.Name).FontSize(18).Bold());
                             if (!string.IsNullOrWhiteSpace(invoice.Company.Address))
                                 col.Item().Text(invoice.Company.Address);
                             if (!string.IsNullOrWhiteSpace(invoice.Company.Phone))
-                                col.Item().Text($"Phone: {invoice.Company.Phone}");
+                                col.Item().Text($"Téléphone : {invoice.Company.Phone}");
                             if (!string.IsNullOrWhiteSpace(invoice.Company.Email))
-                                col.Item().Text($"Email: {invoice.Company.Email}");
+                                col.Item().Text($"Email : {invoice.Company.Email}");
                         });
 
                         row.ConstantItem(180).Column(col =>
                         {
-                            col.Item().Text(t => t.Span($"Invoice #{invoice.InvoiceNumber}").FontSize(16).Bold());
-                            col.Item().Text($"Issued: {invoice.IssuedAt:yyyy-MM-dd}");
+                            col.Item().Text(t => t.Span($"Facture N° {invoice.InvoiceNumber}").FontSize(16).Bold());
+                            col.Item().Text($"Date : {invoice.IssuedAt:yyyy-MM-dd}");
                             if (invoice.DueDate.HasValue)
-                                col.Item().Text($"Due: {invoice.DueDate:yyyy-MM-dd}");
-                            col.Item().Text($"Status: {invoice.Status}");
-                            col.Item().Text($"Payment: {invoice.PaymentMethod}");
+                                col.Item().Text($"Échéance : {invoice.DueDate:yyyy-MM-dd}");
+                            col.Item().Text($"Statut : {invoice.Status}");
+                            col.Item().Text($"Paiement : {invoice.PaymentMethod}");
                         });
                     });
 
@@ -150,12 +182,12 @@ namespace WilliamMetalAPI.Services
                         {
                             row.RelativeItem().Text(t =>
                             {
-                                t.Span("Bill To: ").SemiBold();
+                                t.Span("Client : ").SemiBold();
                                 t.Span(invoice.Customer.Name);
                             });
                             row.RelativeItem().AlignRight().Text(t =>
                             {
-                                t.Span("Currency: ").SemiBold();
+                                t.Span("Devise : ").SemiBold();
                                 t.Span(invoice.Company.Currency);
                             });
                         });
@@ -165,9 +197,9 @@ namespace WilliamMetalAPI.Services
                             row.RelativeItem().Column(c =>
                             {
                                 if (!string.IsNullOrWhiteSpace(invoice.Customer.Phone))
-                                    c.Item().Text($"Phone: {invoice.Customer.Phone}");
+                                    c.Item().Text($"Téléphone : {invoice.Customer.Phone}");
                                 if (!string.IsNullOrWhiteSpace(invoice.Customer.Address))
-                                    c.Item().Text($"Address: {invoice.Customer.Address}");
+                                    c.Item().Text($"Adresse : {invoice.Customer.Address}");
                             });
                             row.RelativeItem();
                         });
@@ -184,9 +216,9 @@ namespace WilliamMetalAPI.Services
 
                             table.Header(header =>
                             {
-                                header.Cell().Element(HeaderCell).Text("Product");
-                                header.Cell().Element(HeaderCell).Text("Variant");
-                                header.Cell().Element(HeaderCell).AlignRight().Text("Qty");
+                                header.Cell().Element(HeaderCell).Text("Produit");
+                                header.Cell().Element(HeaderCell).Text("Variante");
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Qté");
                                 header.Cell().Element(HeaderCell).AlignRight().Text("Total");
                             });
 
@@ -206,12 +238,12 @@ namespace WilliamMetalAPI.Services
                             {
                                 c.Item().Row(r =>
                                 {
-                                    r.RelativeItem().Text(t => t.Span("Subtotal").SemiBold());
+                                    r.RelativeItem().Text(t => t.Span("Sous-total").SemiBold());
                                     r.ConstantItem(90).AlignRight().Text(FormatMoney(invoice.Subtotal, invoice.Company.Currency));
                                 });
                                 c.Item().Row(r =>
                                 {
-                                    r.RelativeItem().Text(t => t.Span($"Tax ({invoice.Company.TaxRate:0.#}%)").SemiBold());
+                                    r.RelativeItem().Text(t => t.Span($"TVA ({invoice.Company.TaxRate:0.#}%)").SemiBold());
                                     r.ConstantItem(90).AlignRight().Text(FormatMoney(invoice.Tax, invoice.Company.Currency));
                                 });
                                 c.Item().Row(r =>
@@ -227,7 +259,7 @@ namespace WilliamMetalAPI.Services
                     {
                         x.Span("Page ");
                         x.CurrentPageNumber();
-                        x.Span(" of ");
+                        x.Span(" / ");
                         x.TotalPages();
                     });
                 });
