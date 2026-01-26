@@ -87,6 +87,18 @@
         overflow-y: auto;
       }
 
+      /* Bigger invoice preview modal */
+      .modal-content.modal-invoice {
+        max-width: 1100px;
+        width: 96%;
+      }
+      @media (max-width: 768px) {
+        .modal-content.modal-invoice {
+          width: 98%;
+          max-width: 98%;
+        }
+      }
+
       .invoice-item {
         transition: all 0.3s ease;
       }
@@ -594,8 +606,8 @@
     </div>
 
     <!-- Invoice Preview Modal -->
-    <div id="invoicePreviewModal" class="modal no-print">
-      <div class="modal-content">
+    <div id="invoicePreviewModal" class="modal">
+      <div class="modal-content modal-invoice">
         <div class="p-6 border-b border-slate-200">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-slate-900">
@@ -672,7 +684,28 @@
         async loadFromApi() {
           try {
             const prodRes = await API.Products.list();
-            this.app.data.products = prodRes?.data ?? prodRes ?? [];
+            const arr = prodRes?.data ?? prodRes ?? [];
+            const products = Array.isArray(arr) ? arr : [];
+
+            // Normalize API shape (camelCase/PascalCase) into the snake_case structure used by the UI.
+            this.app.data.products = products.map((p) => ({
+              id: p.id,
+              name_ar: p.nameAr ?? p.name_ar ?? p.NameAr ?? p.nameAR ?? p.name ?? "",
+              name_fr: p.nameFr ?? p.name_fr ?? p.NameFr ?? p.nameFR ?? p.name_en ?? "",
+              category: p.category ?? p.Category ?? "",
+              description: p.description ?? p.Description ?? "",
+              image: p.image ?? p.Image ?? "",
+              variants: (p.variants ?? p.Variants ?? []).map((v) => ({
+                id: v.id,
+                specification: v.specification ?? v.Specification ?? "",
+                sku: v.sku ?? v.SKU ?? "",
+                price: v.price ?? v.Price ?? 0,
+                cost: v.cost ?? v.Cost ?? 0,
+                stock: v.stock ?? v.Stock ?? 0,
+                min_stock: v.minStock ?? v.min_stock ?? v.MinStock ?? 0,
+                max_stock: v.maxStock ?? v.max_stock ?? v.MaxStock ?? 0,
+              })),
+            }));
           } catch (e) {
             console.error("Products load failed", e);
             this.app.data.products = this.app.data.products || [];
@@ -685,6 +718,8 @@
               ? arr.map((s) => ({
                   id: s.id,
                   invoice_number: s.invoiceNumber ?? s.invoice_number ?? s.id,
+                  payment_method: s.paymentMethod ?? s.payment_method ?? 'CASH',
+                  tax_rate: s.taxRate ?? s.tax_rate ?? 0,
                   customer: { name: s.customer?.name || "غير محدد" },
                   items: s.items || [],
                   subtotal: s.subtotal ?? 0,
@@ -939,7 +974,14 @@
 
           productList.innerHTML = products
             .map((product) => {
-              return product.variants
+              // Show only variants that are in stock (> 0)
+              const inStockVariants = (product.variants || []).filter(
+                (v) => (Number(v.stock) || 0) > 0
+              );
+
+              if (inStockVariants.length === 0) return "";
+
+              return inStockVariants
                 .map(
                   (variant) => `
                         <div class="p-3 border-b border-slate-200 hover:bg-slate-50 cursor-pointer" 
@@ -976,23 +1018,44 @@
           const products = this.app.data.products;
           const productList = document.getElementById("productList");
 
-          const filteredProducts = products.filter(
-            (product) =>
-              product.name_ar
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase()) ||
-              product.variants.some(
-                (variant) =>
-                  variant.specification
-                    .toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
-                  variant.sku.toLowerCase().includes(searchTerm.toLowerCase())
-              )
-          );
+          const term = (searchTerm || "").trim().toLowerCase();
+          if (!term) {
+            this.renderProductList();
+            return;
+          }
+
+          const filteredProducts = products.filter((product) => {
+            const nameAr = (product.name_ar || "").toLowerCase();
+            const nameFr = (product.name_fr || "").toLowerCase();
+            const category = (product.category || "").toLowerCase();
+
+            const variantMatch = (product.variants || []).some((variant) => {
+              const inStock = (Number(variant.stock) || 0) > 0;
+              if (!inStock) return false;
+
+              const spec = (variant.specification || "").toLowerCase();
+              const sku = (variant.sku || "").toLowerCase();
+              return spec.includes(term) || sku.includes(term);
+            });
+
+            return (
+              nameAr.includes(term) ||
+              nameFr.includes(term) ||
+              category.includes(term) ||
+              variantMatch
+            );
+          });
 
           productList.innerHTML = filteredProducts
             .map((product) => {
-              return product.variants
+              // Show only variants that are in stock (> 0)
+              const inStockVariants = (product.variants || []).filter(
+                (v) => (Number(v.stock) || 0) > 0
+              );
+
+              if (inStockVariants.length === 0) return "";
+
+              return inStockVariants
                 .map(
                   (variant) => `
                         <div class="p-3 border-b border-slate-200 hover:bg-slate-50 cursor-pointer" 
@@ -1027,7 +1090,9 @@
 
         addInvoiceItem(productId, variantId) {
           const product = this.app.getProduct(productId);
-          const variant = product.variants.find((v) => v.id === variantId);
+          const variant = (product.variants || []).find(
+            (v) => String(v.id) === String(variantId)
+          );
 
           if (!variant || variant.stock <= 0) {
             this.app.showNotification("المنتج غير متوفر في المخزون", "error");
@@ -1055,11 +1120,28 @@
               this.invoiceItems.push({
                 product_id: productId,
                 variant_id: variantId,
-                product_name: product.nameFr ?? product.name_fr ?? product.nameAr ?? product.name_ar ?? product.name ?? "Produit",
+                product_name_ar:
+                  product.name_ar ?? product.nameAr ?? product.name ?? "Produit",
+                product_name_fr:
+                  product.name_fr ??
+                  product.nameFr ??
+                  product.name_en ??
+                  product.name_ar ??
+                  product.nameAr ??
+                  product.name ??
+                  "Produit",
+                product_name:
+                  product.name_fr ??
+                  product.nameFr ??
+                  product.name_en ??
+                  product.name_ar ??
+                  product.nameAr ??
+                  product.name ??
+                  "Produit",
                 variant_name: variant.specification ?? variant.name ?? "",
                 quantity: 1,
-                unit_price: variant.price,
-                total_price: variant.price,
+                unit_price: variant.price ?? 0,
+                total_price: variant.price ?? 0,
               });
             }
 
@@ -1083,13 +1165,13 @@
                                 <div class="text-sm text-slate-600">${variant}</div>
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-700 mb-1">??????</label>
-                                <input type="number" min="0" step="0.01" value="${item.quantity}" 
+                                <label class="block text-xs font-medium text-slate-700 mb-1">الكمية</label>
+                                <input type="number" min="1" step="1" value="${item.quantity}" 
                                        onchange="updateItemQuantity(${index}, this.value)"
                                        class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-blue-500">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-700 mb-1">?????</label>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">السعر</label>
                                 <input type="number" min="0" step="0.01" value="${item.unit_price}" 
                                        onchange="updateItemPrice(${index}, this.value)"
                                        class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-blue-500">
@@ -1117,16 +1199,18 @@
         updateItemQuantity(index, quantity) {
           const item = this.invoiceItems[index];
           const product = this.app.getProduct(item.product_id);
-          const variant = product?.variants?.find((v) => v.id === item.variant_id);
+          const variant = product?.variants?.find(
+            (v) => String(v.id) === String(item.variant_id)
+          );
 
           const qty = parseFloat(quantity);
           if (Number.isNaN(qty) || qty < 0) {
-            this.app.showNotification("???? ????? ???? ?????", "error");
+            this.app.showNotification("يرجى إدخال كمية صحيحة", "error");
             return;
           }
 
           if (variant && qty > variant.stock) {
-            this.app.showNotification("?????? ???????? ?????? ??????? ?? ???????", "error");
+            this.app.showNotification("الكمية المطلوبة غير متوفرة في المخزون", "error");
             return;
           }
 
@@ -1168,136 +1252,289 @@
             this.app.formatCurrency(total);
         }
 
-        previewInvoice() {
-          if (this.invoiceItems.length === 0) {
-            this.app.showNotification("يرجى إضافة عناصر للفاتورة", "error");
-            return;
-          }
 
+        // ------------------------------
+        // Invoice (Preview + Print) - Modern French Invoice (Option 2)
+        // ------------------------------
+        getInvoiceCss() {
+          return `
+            /* Modern enterprise invoice (screen) */
+            .wm-invoice{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial; color:#0f172a; max-width:980px; margin:0 auto; font-size:15px; line-height:1.35;}
+            .wm-invoice *{box-sizing:border-box}
+            .wm-invoice .muted{color:#64748b}
+            .wm-invoice .card{background:#fff; border:1px solid #e2e8f0; border-radius:20px; padding:34px 38px; box-shadow:0 18px 40px rgba(2,6,23,.08)}
+            .wm-invoice .header{display:flex; justify-content:space-between; align-items:flex-start; gap:28px}
+            .wm-invoice .brand{display:flex; gap:16px; align-items:flex-start}
+            .wm-invoice .brand img{width:58px; height:58px; object-fit:contain}
+            .wm-invoice .brand .name{font-size:24px; font-weight:900; letter-spacing:.2px}
+            .wm-invoice .title{font-size:34px; font-weight:950; text-align:right; letter-spacing:.08em}
+            .wm-invoice .kv{display:flex; justify-content:flex-end; gap:10px; font-size:14px; margin-top:8px}
+            .wm-invoice .kv span{color:#64748b}
+            .wm-invoice .divider{height:1px; background:#e2e8f0; margin:20px 0}
+            .wm-invoice .section-title{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#64748b; font-weight:900; margin-bottom:10px}
+            .wm-invoice .billto{display:flex; justify-content:space-between; gap:18px}
+            .wm-invoice .box{border:1px solid #e2e8f0; border-radius:16px; padding:16px; flex:1; background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%)}
+            .wm-invoice table{width:100%; border-collapse:separate; border-spacing:0; margin-top:16px; overflow:hidden; border-radius:14px; border:1px solid #e2e8f0}
+            .wm-invoice thead th{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:#475569; text-align:left; padding:12px 12px; background:#f8fafc; border-bottom:1px solid #e2e8f0}
+            .wm-invoice tbody td{padding:14px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top}
+            .wm-invoice tbody tr:nth-child(even){background:#fcfdff}
+            .wm-invoice td.num, .wm-invoice th.num{text-align:right}
+            .wm-invoice .totals{display:flex; justify-content:flex-end; margin-top:16px}
+            .wm-invoice .totals .tbox{width:380px; border:1px solid #e2e8f0; border-radius:16px; padding:14px 16px; background:#ffffff}
+            .wm-invoice .totals .line{display:flex; justify-content:space-between; padding:8px 0}
+            .wm-invoice .totals .line strong{font-weight:900}
+            .wm-invoice .totals .grand{border-top:1px solid #e2e8f0; margin-top:8px; padding-top:10px; font-size:17px}
+            .wm-invoice .footer{margin-top:22px; padding-top:16px; border-top:1px solid #e2e8f0; font-size:13px; color:#334155; display:flex; justify-content:space-between; gap:16px}
+
+            /* Print (A4) */
+            @media print{
+              @page{size:A4; margin:14mm;}
+              html,body{margin:0; padding:0; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+              .no-print{display:none!important}
+              .wm-invoice{max-width:none; margin:0;}
+              .wm-invoice .card{border:none; box-shadow:none; padding:0;}
+            }
+`;
+        }
+
+        ensureInvoiceStyles() {
+          if (document.getElementById("wmInvoiceStyles")) return;
+          const style = document.createElement("style");
+          style.id = "wmInvoiceStyles";
+          style.textContent = this.getInvoiceCss();
+          document.head.appendChild(style);
+        }
+
+        formatMoneyFR(amount) {
+          const n = Number(amount || 0);
+          try {
+            return new Intl.NumberFormat("fr-MA", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }).format(n) + " DH";
+          } catch {
+            return n.toFixed(2).replace(".", ",") + " DH";
+          }
+        }
+
+        formatDateFR(dateLike) {
+          const d = dateLike ? new Date(dateLike) : new Date();
+          try {
+            return d.toLocaleDateString("fr-MA");
+          } catch {
+            return d.toISOString().split("T")[0];
+          }
+        }
+
+        paymentLabel(code) {
+          return code === "CASH"
+            ? "Espèces"
+            : code === "CREDIT"
+            ? "Crédit"
+            : code === "CHECK"
+            ? "Chèque"
+            : "Espèces";
+        }
+
+        buildInvoiceModelFromForm(invoiceNumber = null) {
           const customerName =
-            document.getElementById("customerName").value || "عميل";
+            document.getElementById("customerName").value?.trim() || "Client";
           const customerPhone =
-            document.getElementById("customerPhone").value || "";
+            document.getElementById("customerPhone").value?.trim() || "";
           const customerAddress =
-            document.getElementById("customerAddress").value || "";
-          const paymentMethod = document.getElementById("paymentMethod").value;
+            document.getElementById("customerAddress").value?.trim() || "";
+
           const taxRate =
             parseFloat(document.getElementById("taxRate").value) || 0;
+          const paymentMethod = document.getElementById("paymentMethod").value;
 
-          const subtotal = this.invoiceItems.reduce(
-            (sum, item) => sum + item.total_price,
-            0
+          const items = (this.invoiceItems || []).map((it) => {
+            const name =
+              it.product_name_fr ||
+              it.product_name ||
+              it.product_name_ar ||
+              "Produit";
+            const variant = it.variant_name || "";
+            const qty = Number(it.quantity || 0);
+            const unit = Number(it.unit_price || 0);
+            const total = Number(it.total_price || qty * unit);
+            return { name, variant, qty, unit, total };
+          });
+
+          const subtotal = items.reduce((s, i) => s + (i.total || 0), 0);
+          const tax = subtotal * (taxRate / 100);
+          const total = subtotal + tax;
+
+          const seq = String((this.app?.data?.sales?.length || 0) + 1).padStart(
+            4,
+            "0"
           );
-          const taxAmount = subtotal * (taxRate / 100);
-          const total = subtotal + taxAmount;
+          const invNo =
+            invoiceNumber || `INV-${new Date().getFullYear()}-${seq}`;
 
-          const invoiceNumber = `INV-${new Date().getFullYear()}-${String(
-            this.app.data.sales.length + 1
-          ).padStart(4, "0")}`;
-          const invoiceDate = new Date().toLocaleDateString("ar-MA");
+          return {
+            invoiceNumber: invNo,
+            date: this.formatDateFR(new Date()),
+            company: {
+              name: "William Metal",
+              address: "Kelaat M'Gouna, Maroc",
+              phone: "+212 6 72 65 58 74",
+              email: "info@williammetal.com",
+            },
+            customer: {
+              name: customerName,
+              phone: customerPhone,
+              address: customerAddress,
+            },
+            items,
+            taxRate,
+            subtotal,
+            tax,
+            total,
+            paymentMethodLabel: this.paymentLabel(paymentMethod),
+          };
+        }
 
-          const previewContent = `
-                    <div class="invoice-preview">
-                        <div class="flex justify-between items-center mb-6">
-                            <div>
-                                <h2 class="text-2xl font-bold text-slate-900">William Metal</h2>
-                                <p class="text-slate-600">قـلعـة مــكونــة، المغرب</p>
-                                <p class="text-slate-600">هاتف: +212676557874</p>
-                            </div>
-                            <div class="text-left">
-                                <h3 class="text-xl font-bold text-slate-900">فاتورة مبيعات</h3>
-                                <p class="text-slate-600">رقم الفاتورة: ${invoiceNumber}</p>
-                                <p class="text-slate-600">التاريخ: ${invoiceDate}</p>
-                            </div>
-                        </div>
+        buildInvoiceModelFromDto(dto) {
+          const company = dto?.company || {};
+          const customer = dto?.customer || {};
+          const items = (dto?.items || []).map((i) => ({
+            name: i.productName || "Produit",
+            variant: i.variantName || "",
+            qty: Number(i.quantity || 0),
+            unit: Number(i.unitPrice || 0),
+            total: Number(i.lineTotal || i.totalPrice || 0),
+          }));
 
-                        <div class="border-t border-b border-slate-200 py-4 mb-6">
-                            <h4 class="font-semibold text-slate-900 mb-2">معلومات العميل:</h4>
-                            <p class="text-slate-700">الاسم: ${customerName}</p>
-                            ${
-                              customerPhone
-                                ? `<p class="text-slate-700">الهاتف: ${customerPhone}</p>`
-                                : ""
-                            }
-                            ${
-                              customerAddress
-                                ? `<p class="text-slate-700">العنوان: ${customerAddress}</p>`
-                                : ""
-                            }
-                        </div>
+          const subtotal = Number(dto?.subtotal ?? dto?.subTotal ?? 0);
+          const taxRate = Number(dto?.taxRate ?? dto?.taxrate ?? 0);
+          const tax = Number(dto?.tax ?? 0);
+          const total = Number(dto?.total ?? 0);
 
-                        <table class="w-full mb-6">
-                            <thead>
-                                <tr class="border-b border-slate-200">
-                                    <th class="text-right py-2 font-semibold text-slate-900">المنتج</th>
-                                    <th class="text-center py-2 font-semibold text-slate-900">الكمية</th>
-                                    <th class="text-right py-2 font-semibold text-slate-900">السعر</th>
-                                    <th class="text-right py-2 font-semibold text-slate-900">المجموع</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${this.invoiceItems
-                                  .map(
-                                    (item) => `
-                                    <tr class="border-b border-slate-100">
-                                        <td class="py-2 text-slate-700">${
-                                          item.product_name
-                                        } - ${item.variant_name}</td>
-                                        <td class="py-2 text-center text-slate-700">${
-                                          item.quantity
-                                        }</td>
-                                        <td class="py-2 text-right text-slate-700">${this.app.formatCurrency(
-                                          item.unit_price
-                                        )}</td>
-                                        <td class="py-2 text-right text-slate-700">${this.app.formatCurrency(
-                                          item.total_price
-                                        )}</td>
-                                    </tr>
-                                `
-                                  )
-                                  .join("")}
-                            </tbody>
-                        </table>
+          return {
+            invoiceNumber: dto?.invoiceNumber || "INV",
+            date: this.formatDateFR(dto?.issuedAt || dto?.createdAt),
+            company: {
+              name: company?.name || "William Metal",
+              address: company?.address || "Kelaat M'Gouna, Maroc",
+              phone: company?.phone || "+212 6 72 65 58 74",
+              email: company?.email || "info@williammetal.com",
+            },
+            customer: {
+              name: customer?.name || "Client",
+              phone: customer?.phone || "",
+              address: customer?.address || "",
+            },
+            items,
+            taxRate,
+            subtotal,
+            tax,
+            total,
+            paymentMethodLabel: this.paymentLabel(dto?.paymentMethod || "CASH"),
+          };
+        }
 
-                        <div class="flex justify-end">
-                            <div class="w-64">
-                                <div class="flex justify-between mb-2">
-                                    <span class="font-medium text-slate-700">المجموع الفرعي:</span>
-                                    <span class="font-semibold text-slate-900">${this.app.formatCurrency(
-                                      subtotal
-                                    )}</span>
-                                </div>
-                                <div class="flex justify-between mb-2">
-                                    <span class="font-medium text-slate-700">الضريبة (${taxRate}%):</span>
-                                    <span class="font-semibold text-slate-900">${this.app.formatCurrency(
-                                      taxAmount
-                                    )}</span>
-                                </div>
-                                <div class="flex justify-between pt-2 border-t border-slate-200">
-                                    <span class="text-lg font-bold text-slate-900">الإجمالي:</span>
-                                    <span class="text-lg font-bold text-slate-900">${this.app.formatCurrency(
-                                      total
-                                    )}</span>
-                                </div>
-                            </div>
-                        </div>
+        renderInvoiceHtml(model) {
+          const baseHref = new URL(".", window.location.href).href;
+          const logoSrc = new URL("resources/logo.png", baseHref).href;
 
-                        <div class="mt-6 pt-4 border-t border-slate-200">
-                            <p class="text-sm text-slate-600">طريقة الدفع: ${
-                              paymentMethod === "CASH"
-                                ? "نقداً"
-                                : paymentMethod === "CREDIT"
-                                ? "آجل"
-                                : "شيك"
-                            }</p>
-                            <p class="text-sm text-slate-600 mt-2">شكراً لثقتكم بنا</p>
-                        </div>
+          const rows = (model.items || [])
+            .map(
+              (it, idx) => `
+              <tr>
+                <td>
+                  <div style="font-weight:700">${it.name}</div>
+                  ${it.variant ? `<div class="muted" style="font-size:12px">${it.variant}</div>` : ""}
+                </td>
+                <td class="num">${it.qty}</td>
+                <td class="num">${this.formatMoneyFR(it.unit)}</td>
+                <td class="num" style="font-weight:800">${this.formatMoneyFR(it.total)}</td>
+              </tr>
+            `
+            )
+            .join("");
+
+          return `
+            <div class="wm-invoice" dir="ltr">
+              <div class="card">
+                <div class="header">
+                  <div class="brand">
+                    <img src="${logoSrc}" alt="William Metal" />
+                    <div>
+                      <div class="name">${model.company.name}</div>
+                      <div class="muted" style="font-size:13px">${model.company.address}</div>
+                      <div class="muted" style="font-size:13px">Téléphone : ${model.company.phone}</div>
+                      <div class="muted" style="font-size:13px">Email : ${model.company.email}</div>
                     </div>
-                `;
+                  </div>
+                  <div>
+                    <div class="title">FACTURE</div>
+                    <div class="kv"><span>N°</span><strong>${model.invoiceNumber}</strong></div>
+                    <div class="kv"><span>Date</span><strong>${model.date}</strong></div>
+                  </div>
+                </div>
 
-          document.getElementById("invoicePreviewContent").innerHTML =
-            previewContent;
+                <div class="divider"></div>
+
+                <div class="billto">
+                  <div class="box">
+                    <div class="section-title">Client</div>
+                    <div style="font-weight:800; font-size:14px">${model.customer.name}</div>
+                    ${model.customer.phone ? `<div class="muted" style="margin-top:6px">Téléphone : ${model.customer.phone}</div>` : ""}
+                    ${model.customer.address ? `<div class="muted">Adresse : ${model.customer.address}</div>` : ""}
+                  </div>
+                  <div class="box">
+                    <div class="section-title">Paiement</div>
+                    <div style="font-weight:800">Mode : ${model.paymentMethodLabel}</div>
+                    <div class="muted" style="margin-top:6px">TVA : ${model.taxRate}%</div>
+                  </div>
+                </div>
+
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produit</th>
+                      <th class="num">Qté</th>
+                      <th class="num">Prix Unitaire</th>
+                      <th class="num">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows || ""}
+                  </tbody>
+                </table>
+
+                <div class="totals">
+                  <div class="tbox">
+                    <div class="line"><span class="muted">Sous-total</span><strong>${this.formatMoneyFR(model.subtotal)}</strong></div>
+                    <div class="line"><span class="muted">TVA (${model.taxRate}%)</span><strong>${this.formatMoneyFR(model.tax)}</strong></div>
+                    <div class="line grand"><span style="font-weight:900">Total</span><strong style="font-weight:900">${this.formatMoneyFR(model.total)}</strong></div>
+                  </div>
+                </div>
+
+                <div class="footer">
+                  <div>Merci pour votre confiance.</div>
+                  <div class="muted">William Metal</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        showInvoicePreview(html) {
+          this.ensureInvoiceStyles();
+          document.getElementById("invoicePreviewContent").innerHTML = html;
           document.getElementById("invoicePreviewModal").classList.add("show");
+        }
+
+        async previewInvoice() {
+          if (this.invoiceItems.length === 0) {
+            this.app.showNotification("يرجى إضافة منتجات للفاتورة", "error");
+            return;
+          }
+          const model = this.buildInvoiceModelFromForm();
+          const html = this.renderInvoiceHtml(model);
+          this.showInvoicePreview(html);
         }
 
         closeInvoicePreview() {
@@ -1307,187 +1544,120 @@
         }
 
         printInvoice() {
-          window.print();
-        }
+          const content = document.getElementById("invoicePreviewContent").innerHTML;
+          if (!content) return;
 
-        saveSale() {
-          if (this.invoiceItems.length === 0) {
-            this.app.showNotification("يرجى إضافة عناصر للفاتورة", "error");
+          const baseHref = new URL(".", window.location.href).href;
+          const w = window.open("", "_blank");
+          if (!w) {
+            this.app.showNotification("Veuillez autoriser les pop-ups pour imprimer.", "error");
             return;
           }
 
-          const customerName = document.getElementById("customerName").value;
+          w.document.open();
+          w.document.write(`<!doctype html><html><head><meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width,initial-scale=1" />
+            <base href="${baseHref}">
+            <title>Facture</title>
+            <style>${this.getInvoiceCss()}</style>
+          </head><body>${content}</body></html>`);
+          w.document.close();
+
+          // Wait for images to load
+          const tryPrint = () => {
+            try {
+              w.focus();
+              w.print();
+              w.close();
+            } catch {
+              // ignore
+            }
+          };
+
+          setTimeout(tryPrint, 400);
+        }
+
+        async saveSale() {
+          if (this.invoiceItems.length === 0) {
+            this.app.showNotification("يرجى إضافة منتجات للفاتورة", "error");
+            return;
+          }
+
+          const customerName = document.getElementById("customerName").value?.trim();
           if (!customerName) {
             this.app.showNotification("يرجى إدخال اسم العميل", "error");
             return;
           }
 
-          const subtotal = this.invoiceItems.reduce(
-            (sum, item) => sum + item.total_price,
-            0
-          );
-          const taxRate =
-            parseFloat(document.getElementById("taxRate").value) || 0;
-          const taxAmount = subtotal * (taxRate / 100);
-          const total = subtotal + taxAmount;
+          const taxRate = parseFloat(document.getElementById("taxRate").value) || 0;
+          const paymentMethod = document.getElementById("paymentMethod").value;
 
-          const saleData = {
+          const payload = {
             customer: {
               name: customerName,
-              phone: document.getElementById("customerPhone").value,
-              address: document.getElementById("customerAddress").value,
+              phone: document.getElementById("customerPhone").value?.trim() || null,
+              address: document.getElementById("customerAddress").value?.trim() || null,
             },
-            items: this.invoiceItems,
-            subtotal: subtotal,
-            tax: taxAmount,
-            total: total,
-            payment_method: document.getElementById("paymentMethod").value,
-            status: "COMPLETED",
+            items: this.invoiceItems.map((it) => ({
+              productId: it.product_id,
+              variantId: it.variant_id,
+              quantity: Number(it.quantity || 0),
+              unitPrice: Number(it.unit_price || 0),
+            })),
+            paymentMethod,
+            taxRate,
           };
 
-          const newSale = this.app.createSale(saleData);
-
-          if (newSale) {
-            this.app.showNotification("تم إنشاء الفاتورة بنجاح", "success");
+          try {
+            await API.Sales.create(payload);
+            this.app.showNotification("تم حفظ الفاتورة بنجاح", "success");
             this.closeSaleModal();
+
+            // Refresh from API to reflect stock / sale list
+            await this.loadFromApi();
             this.updateStats();
             this.renderSales();
-          } else {
-            this.app.showNotification("فشل إنشاء الفاتورة", "error");
+          } catch (e) {
+            console.error(e);
+            this.app.showNotification("فشل حفظ الفاتورة", "error");
           }
         }
 
-        viewInvoice(saleId) {
-          const sale = this.app.data.sales.find((s) => s.id === saleId);
-          if (sale) {
-            this.generateInvoicePreview(sale);
+        async viewInvoice(saleId) {
+          try {
+            const res = await API.Invoices.get(saleId);
+            const dto = res?.data ?? res;
+            const model = this.buildInvoiceModelFromDto(dto);
+            const html = this.renderInvoiceHtml(model);
+            this.showInvoicePreview(html);
+          } catch (e) {
+            console.error('Invoice fetch failed', e);
+            this.app.showNotification("تعذر تحميل الفاتورة", "error");
           }
         }
 
-        generateInvoicePreview(sale) {
-          const invoiceNumber = sale.invoice_number || sale.id || '';
-          const invoiceDate = this.app.formatDate(sale.created_at);
-          const customerName = sale.customer?.name || 'Client';
-          const customerPhone = sale.customer?.phone || '';
-          const customerAddress = sale.customer?.address || '';
-          const subtotal = this.invoiceItems.reduce((sum, item) => sum + item.total_price, 0);
-          const taxRate = parseFloat(document.getElementById('taxRate')?.value || 0);
-          const taxAmount = subtotal * (taxRate / 100);
-          const total = subtotal + taxAmount;
-          const paymentMethod = document.getElementById('paymentMethod')?.value || '';
-
-          const previewContent = `
-                    <div class="invoice-preview">
-                        <div class="flex justify-between items-center mb-6">
-                            <div class="flex items-center gap-3">
-                                <img src="resources/logo.png" alt="William Metal" class="w-16 h-16 object-contain">
-                                <div>
-                                    <h2 class="text-2xl font-bold text-slate-900">William Metal</h2>
-                                    <p class="text-slate-600">KELAAT MAGOUNA, Maroc</p>
-                                    <p class="text-slate-600">T?l?phone : +212 6 76 55 78 74</p>
-                                    <p class="text-slate-600">ICE : 00333472600029</p>
-                                </div>
-                            </div>
-                            <div class="text-left">
-                                <h3 class="text-xl font-bold text-slate-900">Facture de Vente</h3>
-                                <p class="text-slate-600">N? Facture : ${invoiceNumber}</p>
-                                <p class="text-slate-600">Date : ${invoiceDate}</p>
-                            </div>
-                        </div>
-
-                        <div class="border-t border-b border-slate-200 py-4 mb-6">
-                            <h4 class="font-semibold text-slate-900 mb-2">Client :</h4>
-                            <p class="text-slate-700">Nom : ${customerName}</p>
-                            ${customerPhone ? `<p class="text-slate-700">T?l?phone : ${customerPhone}</p>` : ''}
-                            ${customerAddress ? `<p class="text-slate-700">Adresse : ${customerAddress}</p>` : ''}
-                        </div>
-
-                        <table class="w-full mb-6">
-                            <thead>
-                                <tr class="border-b border-slate-200">
-                                    <th class="text-right py-2 font-semibold text-slate-900">Produit</th>
-                                    <th class="text-center py-2 font-semibold text-slate-900">Qt?</th>
-                                    <th class="text-right py-2 font-semibold text-slate-900">Prix</th>
-                                    <th class="text-right py-2 font-semibold text-slate-900">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${this.invoiceItems
-                                  .map(
-                                    (item) => {
-                                      const product = this.app.getProduct(item.product_id) || {};
-                                      const name = product.nameFr || product.name_fr || product.nameAr || product.name_ar || product.name || item.product_name || 'Produit';
-                                      return `
-                                    <tr class="border-b border-slate-100">
-                                        <td class="py-2 text-slate-700">${name} - ${item.variant_name || ''}</td>
-                                        <td class="py-2 text-center text-slate-700">${item.quantity}</td>
-                                        <td class="py-2 text-right text-slate-700">${this.app.formatCurrency(item.unit_price)}</td>
-                                        <td class="py-2 text-right text-slate-700">${this.app.formatCurrency(item.total_price)}</td>
-                                    </tr>
-                                `;
-                                    }
-                                  )
-                                  .join('')}
-                            </tbody>
-                        </table>
-
-                        <div class="flex justify-end">
-                            <div class="w-64">
-                                <div class="flex justify-between mb-2">
-                                    <span class="font-medium text-slate-700">Sous-total :</span>
-                                    <span class="font-semibold text-slate-900">${this.app.formatCurrency(subtotal)}</span>
-                                </div>
-                                <div class="flex justify-between mb-2">
-                                    <span class="font-medium text-slate-700">TVA (${taxRate}%):</span>
-                                    <span class="font-semibold text-slate-900">${this.app.formatCurrency(taxAmount)}</span>
-                                </div>
-                                <div class="flex justify-between pt-2 border-t border-slate-200">
-                                    <span class="text-lg font-bold text-slate-900">Total :</span>
-                                    <span class="text-lg font-bold text-slate-900">${this.app.formatCurrency(total)}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-6 pt-4 border-t border-slate-200">
-                            <p class="text-sm text-slate-600">Mode de paiement : ${paymentMethod === 'CASH' ? 'Esp?ces' : paymentMethod === 'CREDIT' ? 'Cr?dit' : 'Ch?que'}</p>
-                            <p class="text-sm text-slate-600 mt-2">Merci pour votre confiance.</p>
-                        </div>
-                    </div>
-                `;
-document.getElementById("invoicePreviewContent").innerHTML =
-            previewContent;
-          document.getElementById("invoicePreviewModal").classList.add("show");
+        async printSaleInvoice(saleId) {
+          await this.viewInvoice(saleId);
+          this.printInvoice();
         }
+        async deleteSale(saleId) {
+          if (!confirm("هل أنت متأكد من حذف هذه الفاتورة؟")) return;
 
-        deleteSale(saleId) {
-          if (confirm("هل أنت متأكد من حذف هذه الفاتورة؟")) {
-            const index = this.app.data.sales.findIndex((s) => s.id === saleId);
-            if (index !== -1) {
-              // Restore stock
-              const sale = this.app.data.sales[index];
-              sale.items.forEach((item) => {
-                this.app.updateStock(
-                  item.product_id,
-                  item.variant_id,
-                  item.quantity,
-                  "IN",
-                  {
-                    type: "SALE_CANCEL",
-                    id: saleId,
-                  }
-                );
-              });
+          try {
+            await API.Sales.delete(saleId);
+            this.app.showNotification("تم حذف الفاتورة بنجاح", "success");
 
-              this.app.data.sales.splice(index, 1);
-              this.app.saveData();
-              this.app.showNotification("تم حذف الفاتورة بنجاح", "success");
-              this.updateStats();
-              this.renderSales();
-            }
+            await this.loadFromApi();
+            this.updateStats();
+            this.renderSales();
+          } catch (e) {
+            console.error(e);
+            this.app.showNotification("فشل حذف الفاتورة", "error");
           }
         }
 
         exportSales() {
+
           const sales = this.app.data.sales.map((sale) => ({
             "رقم الفاتورة": sale.invoice_number,
             العميل: sale.customer?.name || "عميل",
@@ -1603,10 +1773,7 @@ document.getElementById("invoicePreviewContent").innerHTML =
 
       function printInvoice(saleId = null) {
         if (saleId) {
-          salesManager.viewInvoice(saleId);
-          setTimeout(() => {
-            window.print();
-          }, 500);
+          salesManager.printSaleInvoice(saleId);
         } else {
           salesManager.printInvoice();
         }

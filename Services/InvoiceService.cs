@@ -112,11 +112,11 @@ namespace WilliamMetalAPI.Services
                     Phone = company?.Phone,
                     Email = company?.Email,
                     TaxRate = company?.TaxRate ?? 0,
-                    Currency = company?.Currency ?? "MAD"
+                    Currency = (company?.Currency ?? "MAD") == "MAD" ? "DH" : (company?.Currency ?? "MAD")
                 },
                 Items = sale.Items.Select(item => new InvoiceItemDto
                 {
-                    ProductName = item.Variant.Product.NameAr,
+                    ProductName = item.Variant.Product.NameFr ?? item.Variant.Product.NameAr,
                     VariantName = item.Variant.Specification,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
